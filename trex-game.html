@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>T-Rex Runner</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f7f7f7;
+            font-family: 'Arial', sans-serif;
+        }
+        
+        .game-container {
+            position: relative;
+            width: 800px;
+            height: 300px;
+            overflow: hidden;
+            background-color: #fff;
+            border: 1px solid #ddd;
+        }
+        
+        #game-canvas {
+            background-color: #fff;
+        }
+        
+        .score-container {
+            position: absolute;
+            top: 10px;
+            right: 20px;
+            font-size: 16px;
+            color: #535353;
+        }
+        
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: none;
+        }
+        
+        .game-over h2 {
+            color: #535353;
+            margin-bottom: 10px;
+        }
+        
+        .game-over p {
+            color: #7e7e7e;
+            margin-bottom: 20px;
+        }
+        
+        .restart-button {
+            background: none;
+            border: 1px solid #535353;
+            color: #535353;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            border-radius: 4px;
+        }
+        
+        .restart-button:hover {
+            background-color: #f1f1f1;
+        }
+        
+        .instructions {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            font-size: 12px;
+            color: #7e7e7e;
+        }
+    </style>
+</head>
+<body>
+    <div class="game-container">
+        <canvas id="game-canvas" width="800" height="300"></canvas>
+        <div class="score-container">
+            Score: <span id="score">0</span>
+        </div>
+        <div class="game-over" id="game-over">
+            <h2>Game Over</h2>
+            <p>Press Space to restart</p>
+            <button class="restart-button" id="restart-button">Restart</button>
+        </div>
+        <div class="instructions">
+            Press Space/Up Arrow to jump, Down Arrow to duck
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+    
+        const GAME_WIDTH = 800;
+        const GAME_HEIGHT = 300;
+        const GROUND_Y = GAME_HEIGHT - 20;
+    
+        let score = 0;
+        let gameSpeed = 6;
+        let isGameOver = false;
+        let isJumping = false;
+        let animationId;
+    
+        const dino = {
+            x: 50,
+            y: GROUND_Y - 40,
+            width: 40,
+            height: 40,
+            jumpVelocity: 0,
+            gravity: 0.6,
+            jumpForce: -12,
+            maxJumpHeight: 80 // Ensuring obstacles remain jumpable
+        };
+    
+        let obstacles = [];
+        let obstacleTimer = 0;
+    
+        const obstacleColors = ['#FF5733', '#33FF57', '#3357FF', '#F39C12', '#9B59B6', '#E74C3C', '#1ABC9C']; // Variant colors 🎨
+    
+        function drawDino() {
+            ctx.fillStyle = '#535353';
+            ctx.fillRect(dino.x, dino.y, dino.width, dino.height);
+        }
+    
+        function jump() {
+            if (!isJumping) {
+                isJumping = true;
+                dino.jumpVelocity = dino.jumpForce;
+            }
+        }
+    
+        function updateDino() {
+            if (isJumping) {
+                dino.y += dino.jumpVelocity;
+                dino.jumpVelocity += dino.gravity;
+                if (dino.y >= GROUND_Y - 40) {
+                    dino.y = GROUND_Y - 40;
+                    isJumping = false;
+                }
+            }
+        }
+    
+        function createObstacle() {
+            let maxObstacleHeight = dino.maxJumpHeight - 10; // Ensuring the dino can jump over it
+            let minObstacleHeight = 20;
+            let obstacleHeight = Math.random() * (maxObstacleHeight - minObstacleHeight) + minObstacleHeight;
+            let obstacleColor = obstacleColors[Math.floor(Math.random() * obstacleColors.length)]; // Assign a random color 🎨
+    
+            obstacles.push({
+                x: GAME_WIDTH,
+                y: GROUND_Y - obstacleHeight,
+                width: 20,
+                height: obstacleHeight,
+                color: obstacleColor
+            });
+        }
+    
+        function updateObstacles() {
+            obstacleTimer++;
+            if (obstacleTimer > 100) {
+                createObstacle();
+                obstacleTimer = 0;
+            }
+    
+            obstacles.forEach((obstacle, index) => {
+                obstacle.x -= gameSpeed;
+                if (obstacle.x + obstacle.width < 0) {
+                    obstacles.splice(index, 1);
+                    score++;
+                    document.getElementById('score').textContent = score;
+                }
+            });
+        }
+    
+        function drawObstacles() {
+            obstacles.forEach(obstacle => {
+                ctx.fillStyle = obstacle.color; // Use the assigned random color 🎨
+                ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+            });
+        }
+    
+        function checkCollision() {
+            obstacles.forEach(obstacle => {
+                if (dino.x < obstacle.x + obstacle.width &&
+                    dino.x + dino.width > obstacle.x &&
+                    dino.y < obstacle.y + obstacle.height &&
+                    dino.y + dino.height > obstacle.y) {
+                    gameOver();
+                }
+            });
+        }
+    
+        function gameOver() {
+            isGameOver = true;
+            cancelAnimationFrame(animationId);
+            document.getElementById('game-over').style.display = 'block';
+        }
+    
+        function resetGame() {
+            isGameOver = false;
+            obstacles = [];
+            score = 0;
+            dino.y = GROUND_Y - 40;
+            document.getElementById('score').textContent = score;
+            document.getElementById('game-over').style.display = 'none';
+            gameLoop();
+        }
+    
+        function gameLoop() {
+            if (isGameOver) return;
+    
+            ctx.clearRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
+            updateDino();
+            updateObstacles();
+            checkCollision();
+            drawDino();
+            drawObstacles();
+    
+            animationId = requestAnimationFrame(gameLoop);
+        }
+    
+        document.addEventListener('keydown', event => {
+            if (event.code === 'Space' || event.code === 'ArrowUp') {
+                if (isGameOver) {
+                    resetGame();
+                } else {
+                    jump();
+                }
+            }
+        });
+    
+        document.getElementById('restart-button').addEventListener('click', resetGame);
+    
+        gameLoop();
+    </script>
+    
+    
+</body>
+</html>
